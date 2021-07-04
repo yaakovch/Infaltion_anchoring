@@ -1,0 +1,246 @@
+---
+title: "Infaltion_anchoring"
+author: "Yaakov Chen Zion"
+date: "6/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Load data}
+library(tidyverse)
+library(readxl)
+library(roll)
+library(zoo)
+library(ggpubr)
+library(RcppRoll)
+
+df <- read_xlsx("anchoring_data.xlsx", sheet = "import") |>
+filter(year > 2000) |> filter(year < 2020) |>
+mutate(l_inflation_yr = lag(inflation_yr))
+date <- df |> select(Date)
+```
+
+
+```{r graph function}
+gg_roll <- function(res, date) {
+  coefs <- chuck(res, "coefficients")[, 2]
+  NonNAindex <- which(!is.na(coefs))
+  firstNonNA <- min(NonNAindex)
+  coefs <- coefs |> tibble() |>  slice(n = -seq(1, firstNonNA))
+  ln <- nrow(coefs)
+  std <- chuck(res, "std.error")[, 2] |> tibble() |>
+  slice(n = -seq(1, firstNonNA))
+  date <- date |> slice(n = -seq(1, firstNonNA)) |>
+  pull() |> as.yearmon()
+  gg <- tibble(
+    coefs = pull(coefs), std = pull(std),
+    date = date
+  ) |>
+  mutate(upper = coefs + 2 * std) |>
+  mutate(lower = coefs - 2 * std)
+  number_ticks <- function(n) {
+    function(limits) pretty(limits, n)
+  }
+  gg_roll <- ggplot(data = gg, aes(date, coefs)) +
+    geom_line(aes(y = upper), colour = "lightblue2") +
+    geom_line(aes(y = lower), colour = "lightblue") +
+    geom_line(aes(y = coefs)) +
+    geom_ribbon(aes(x = date, ymax = upper, ymin = lower), fill = "lightblue", alpha = .1) +
+    geom_hline(
+      yintercept = 0, color = "red",
+      linetype = "dashed"
+    ) +
+    theme(
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank()
+    ) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+```
+
+```{r Basic specification}
+
+x <- df |> select(l_inflation_yr) |> pull()
+y <- df |> select(fw_3_5) |> pull()
+gg_3_5 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("3-5 inflation, basic specification")
+print(gg_3_5)
+
+y <- df |> select(fw_5_10) |> pull()
+gg_5_10 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("5-10 inflation, basic specification")
+print(gg_5_10)
+
+y <- df |> select(fw_10_15) |> pull()
+gg_10_15 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("10-15 inflation, basic specification")
+print(gg_10_15)
+
+y <- df |> select(fw_15_20) |> pull()
+gg_15_20 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("15-20 inflation, basic specification")
+print(gg_15_20)
+
+ggarrange(gg_3_5, gg_5_10, gg_10_15, gg_15_20)
+```
+
+```{r Advanced graph function}
+gg_roll <- function(res, date) {
+  coefs <- chuck(res, "coefficients")[, 2:3]
+  NonNAindex <- which(!is.na(coefs))
+  firstNonNA <- min(NonNAindex)
+  coefs <- coefs |> as_tibble() |>  slice(n = -seq(1, firstNonNA))
+  ln <- nrow(coefs)
+  std <- chuck(res, "std.error")[, 2:3] |> as_tibble() |>
+  slice(n = -seq(1, firstNonNA)) |>
+  rename(std_l_inflation_yr = l_inflation_yr) |>
+  rename(std_exp_market = exp_market)
+  date <- date |> slice(n = -seq(1, firstNonNA)) |>
+  pull() |> as.yearmon()
+  gg <- bind_cols(
+    coefs, std,
+    date = date
+  ) |>
+  mutate(coefs = l_inflation_yr + exp_market) |>
+  mutate(upper = coefs +
+    2 * (std_l_inflation_yr + std_exp_market)) |>
+  mutate(lower = coefs -
+    2 * (std_l_inflation_yr + std_exp_market))
+  number_ticks <- function(n) {
+    function(limits) pretty(limits, n)
+  }
+  gg_roll <- ggplot(data = gg, aes(date, coefs)) +
+    geom_line(aes(y = upper), colour = "lightblue2") +
+    geom_line(aes(y = lower), colour = "lightblue") +
+    geom_line(aes(y = coefs)) +
+    geom_ribbon(aes(x = date, ymax = upper, ymin = lower), fill = "lightblue", alpha = .1) +
+    geom_hline(
+      yintercept = 0, color = "red",
+      linetype = "dashed"
+    ) +
+    theme(
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank()
+    ) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+```
+
+
+```{r Advanced specification}
+
+x <- df |> select(l_inflation_yr, exp_market) |> as.matrix()
+y <- df |> select(fw_3_5) |> pull()
+gg_3_5 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("3-5 inflation, advanced specification")
+print(gg_3_5)
+
+y <- df |> select(fw_5_10) |> pull()
+gg_5_10 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("5-10 inflation, advanced specification")
+print(gg_5_10)
+
+y <- df |> select(fw_10_15) |> pull()
+gg_10_15 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("10-15 inflation, advanced specification")
+print(gg_10_15)
+
+y <- df |> select(fw_15_20) |> pull()
+gg_15_20 <- roll_lm(x = x, y = y, width = 60) |>
+gg_roll(date) + ggtitle("15-20 inflation, advanced specification")
+print(gg_15_20)
+
+ggarrange(gg_3_5, gg_5_10, gg_10_15, gg_15_20)
+```
+
+
+```{r Comapre to EPUi}
+
+
+df <- df |> mutate(date = as.yearmon(Date))
+
+df_epu <- read_csv("temp_epu_month.csv") |>
+select(time_period, epu_scaled) |>
+rename(date = time_period) |> rename(epu = epu_scaled) |>
+mutate(date = as.yearmon(date))
+
+x <- df |> select(l_inflation_yr) |> as.matrix()
+y <- df |> select(fw_3_5) |> pull()
+reg_3_5 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_3_5 <- reg_3_5[, 2]
+
+df_cor_3_5 <- reg_3_5 |> bind_cols(date = as.yearmon(pull(date))) |>
+rename(c = 1) |>
+inner_join(y = df_epu, by = "date", copy = TRUE) |>
+mutate(l_epu = lag(epu)) |>
+mutate(c = c(rep(0, 11), roll_mean(c, n = 12))) |>
+  mutate(c = 50 + 10 * 6 * 10 * c)
+
+
+df_cor_3_5 |> select(c, l_epu) |> cor(use = "complete.obs")
+
+df_cor_3_5 |> select(date, c, l_epu) |>
+pivot_longer(-date) |>
+ggplot(aes(x = date, y = value, color = name)) +
+  geom_line()
+
+y <- df |> select(fw_5_10) |> pull()
+reg_5_10 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_5_10 <- reg_5_10[, 2]
+
+df_cor_5_10 <- reg_5_10 |> bind_cols(date = as.yearmon(pull(date))) |>
+rename(c = 1) |>
+inner_join(y = df_epu, by = "date", copy = TRUE) |>
+mutate(l_epu = lag(epu)) |>
+# mutate(c = c - lag(c)) |>
+  mutate(c = c(rep(0, 11), roll_mean(c, n = 12))) |>
+  mutate(c = 50 + 10 * 6 * 10 * c)
+
+df_cor_5_10 |> select(c, l_epu) |> cor(use = "complete.obs")
+
+df_cor_5_10 |> select(date, c, l_epu) |>
+pivot_longer(-date) |>
+ggplot(aes(x = date, y = value, color = name)) +
+  geom_line()
+
+
+y <- df |> select(fw_10_15) |> pull()
+reg_10_15 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_10_15 <- reg_10_15[, 2]
+
+df_cor_10_15 <- reg_10_15 |> bind_cols(date = as.yearmon(pull(date))) |>
+rename(c = 1) |>
+inner_join(y = df_epu, by = "date", copy = TRUE) |>
+mutate(l_epu = lag(epu)) |>
+mutate(c = c(rep(0, 11), roll_mean(c, n = 12))) |>
+  mutate(c = 50 + 10 * 6 * 10 * c)
+
+df_cor_10_15 |> select(c, l_epu) |> cor(use = "complete.obs")
+
+df_cor_10_15 |> select(date, c, l_epu) |>
+pivot_longer(-date) |>
+ggplot(aes(x = date, y = value, color = name)) +
+  geom_line()
+
+y <- df |> select(fw_15_20) |> pull()
+reg_15_20 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_15_20 <- reg_15_20[, 2]
+
+df_cor_15_20 <- reg_15_20 |> bind_cols(date = as.yearmon(pull(date))) |>
+rename(c = 1) |>
+inner_join(y = df_epu, by = "date", copy = TRUE) |>
+mutate(l_epu = lag(epu)) |>
+mutate(c = c(rep(0, 11), roll_mean(c, n = 12))) |>
+  mutate(c = 50 + 10 * 6 * 10 * c)
+
+df_cor_15_20 |> select(c, l_epu) |> cor(use = "complete.obs")
+
+df_cor_15_20 |> select(date, c, l_epu) |>
+pivot_longer(-date) |>
+ggplot(aes(x = date, y = value, color = name)) +
+  geom_line()
+```
