@@ -170,7 +170,7 @@ mutate(date = as.yearmon(date))
 
 x <- df |> select(l_inflation_yr) |> as.matrix()
 y <- df |> select(fw_3_5) |> pull()
-reg_3_5 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_3_5 <- roll_lm(x = x, y = y, width = 60) |> chuck("coefficients")
 reg_3_5 <- reg_3_5[, 2]
 
 df_cor_3_5 <- reg_3_5 |> bind_cols(date = as.yearmon(pull(date))) |>
@@ -189,7 +189,7 @@ ggplot(aes(x = date, y = value, color = name)) +
   geom_line()
 
 y <- df |> select(fw_5_10) |> pull()
-reg_5_10 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_5_10 <- roll_lm(x = x, y = y, width = 60) |> chuck("coefficients")
 reg_5_10 <- reg_5_10[, 2]
 
 df_cor_5_10 <- reg_5_10 |> bind_cols(date = as.yearmon(pull(date))) |>
@@ -209,7 +209,7 @@ ggplot(aes(x = date, y = value, color = name)) +
 
 
 y <- df |> select(fw_10_15) |> pull()
-reg_10_15 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_10_15 <- roll_lm(x = x, y = y, width = 60) |> chuck("coefficients")
 reg_10_15 <- reg_10_15[, 2]
 
 df_cor_10_15 <- reg_10_15 |> bind_cols(date = as.yearmon(pull(date))) |>
@@ -227,7 +227,7 @@ ggplot(aes(x = date, y = value, color = name)) +
   geom_line()
 
 y <- df |> select(fw_15_20) |> pull()
-reg_15_20 <- roll_lm(x = x, y = y, width = 30) |> chuck("coefficients")
+reg_15_20 <- roll_lm(x = x, y = y, width = 60) |> chuck("coefficients")
 reg_15_20 <- reg_15_20[, 2]
 
 df_cor_15_20 <- reg_15_20 |> bind_cols(date = as.yearmon(pull(date))) |>
